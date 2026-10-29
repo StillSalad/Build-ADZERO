@@ -1,0 +1,25 @@
+name: Crea APK
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Estrai il progetto
+        run: unzip -q "$(ls *.zip | head -n 1)" -d estratto
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Test e APK
+        working-directory: estratto/adzero-android/app/android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon testDebugUnitTest assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: adzero-apk
+          path: estratto/adzero-android/app/android/app/build/outputs/apk/debug/app-debug.apk
