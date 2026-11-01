@@ -1,0 +1,38 @@
+name: 1 - Crea la chiave di firma
+on:
+  workflow_dispatch:
+    inputs:
+      password:
+        description: "Scegli una password per la chiave (almeno 8 caratteri, ricordala!)"
+        required: true
+      nome:
+        description: "Il tuo nome"
+        required: true
+        default: "Lorenzo Marta"
+jobs:
+  crea:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Controlla la password
+        run: if [ ${#PW} -lt 8 ]; then echo "::error::La password deve avere almeno 8 caratteri."; exit 1; fi
+        env:
+          PW: ${{ github.event.inputs.password }}
+      - name: Genera la chiave
+        env:
+          PW: ${{ github.event.inputs.password }}
+          NOME: ${{ github.event.inputs.nome }}
+        run: |
+          keytool -genkeypair -v -keystore adzero.jks -alias adzero -keyalg RSA -keysize 2048 -validity 10950 -storepass "$PW" -keypass "$PW" -dname "CN=$NOME, OU=ADZERO, O=ADZERO, C=IT"
+          base64 -w 0 adzero.jks > adzero.jks.base64.txt
+      - name: Carica il file da scaricare
+        uses: actions/upload-artifact@v4
+        with:
+          name: CHIAVE-adzero-base64
+          path: adzero.jks.base64.txt
+      - name: Istruzioni
+        run: |
+          echo "## Chiave creata. Crea 4 secret in Settings aria Secrets and variables aria Actions:" >> "$GITHUB_STEP_SUMMARY"
+          echo "1. ADZERO_KEYSTORE_BASE64 = contenuto del file CHIAVE-adzero-base64 (scaricalo in Artifacts, apri, copia tutto)" >> "$GITHUB_STEP_SUMMARY"
+          echo "2. ADZERO_KEYSTORE_PASSWORD = la password scelta" >> "$GITHUB_STEP_SUMMARY"
+          echo "3. ADZERO_KEY_ALIAS = adzero" >> "$GITHUB_STEP_SUMMARY"
+          echo "4. ADZERO_KEY_PASSWORD = la stessa password" >> "$GITHUB_STEP_SUMMARY"
