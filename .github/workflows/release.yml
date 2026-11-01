@@ -1,0 +1,46 @@
+name: 2 - Pubblica release firmata
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Estrai il progetto
+        run: unzip -q "$(ls *.zip | head -n 1)" -d estratto
+      - name: Controlla i secret di firma
+        env:
+          KS: ${{ secrets.ADZERO_KEYSTORE_BASE64 }}
+        run: if [ -z "$KS" ]; then echo "::error::Manca il secret ADZERO_KEYSTORE_BASE64."; exit 1; fi
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Prepara la chiave
+        run: echo "${{ secrets.ADZERO_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/adzero.jks"
+      - name: Compila l'APK firmato
+        working-directory: estratto/adzero-android/app/android
+        env:
+          ADZERO_KEYSTORE: ${{ runner.temp }}/adzero.jks
+          ADZERO_KEYSTORE_PASSWORD: ${{ secrets.ADZERO_KEYSTORE_PASSWORD }}
+          ADZERO_KEY_ALIAS: ${{ secrets.ADZERO_KEY_ALIAS }}
+          ADZERO_KEY_PASSWORD: ${{ secrets.ADZERO_KEY_PASSWORD }}
+          ADZERO_VERSION: ${{ github.ref_name }}
+          ADZERO_VERSION_CODE: ${{ github.run_number }}
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleRelease
+      - name: Rinomina e calcola SHA-256
+        run: |
+          cp estratto/adzero-android/app/android/app/build/outputs/apk/release/app-release.apk "ADZERO-${GITHUB_REF_NAME}.apk"
+          sha256sum "ADZERO-${GITHUB_REF_NAME}.apk" > SHA256SUMS.txt
+      - name: Allega alla release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ADZERO-${{ github.ref_name }}.apk
+            SHA256SUMS.txt
